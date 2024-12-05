@@ -7,6 +7,7 @@ RETURN_FORMAT = {
     'json': {"type": "application/json"},
     'env': {"type": "text/plain"},
     'ini': {"type": "text/plain"},
+    'ini-json': {"type": "text/plain"},
     'raw': {"type": "text/plain"},
     'pyfstr': {"type": None}
 }
@@ -86,14 +87,27 @@ class ReturnFormat:
 
         return '\n'.join(output)
 
-    def __dict_to_ini__(self, in_dict):
+    def __format_ini_json__(self, out_data):
         output = []
-        for key, value in in_dict.items():
-            if isinstance(value, dict):
-                output = output + self.__dict_to_ini__(in_dict=value)
-            else:
-                output.append(f'{key} = {value}')
-        return output
+        for secret_key, secret_value in out_data.items():
+            
+            for secret in secret_value:
+                # Verify that secret is a dict
+                if not isinstance(secret, dict):
+                    raise ValueError(f"Secret Value is not valid json")
+
+                for top_key, top_values in secret.items():
+                    prefix = '\n' if len(output) > 1 else ''
+                    output.append(f"{prefix}[{top_key}]")
+                    # Attempt to convert the top_values to a dict
+                    try:
+                        values_dict = json.loads(top_values)
+                    except Exception as e:
+                        raise ValueError(f"Secret Value is not valid json. {e}")
+                    for key, value in values_dict.items():
+                        output.append(f'{key} = {value}')
+            
+        return '\n'.join(output) 
     
     def __format_ini__(self, out_data):
         output = []
@@ -101,9 +115,8 @@ class ReturnFormat:
             if self.ini_secret_key:
                 output.append(f'[{secret_key}]')
             for secret in secret_value:
-                output = output + self.__dict_to_ini__(in_dict=secret)
-                #for key, value in secret.items():
-                #    output.append(f'{key} = {value}')
+                for key, value in secret.items():
+                   output.append(f'{key} = {value}')
 
         return '\n'.join(output) 
 
@@ -117,4 +130,4 @@ class ReturnFormat:
     
     def out(self, out_data: dict):
         self.logger.debug(f"Returning data in the format: '{self.out_format}'")
-        return getattr(self, f"__format_{self.out_format}__")(out_data)
+        return getattr(self, f"__format_{self.out_format.replace('-', '_')}__")(out_data)

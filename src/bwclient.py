@@ -59,10 +59,17 @@ class BWClient:
         """ Store value data securely """
         if encode:
             # print(f"encrypting str: {in_data}")
+            if isinstance(in_data, dict):
+                in_data = json.dumps(in_data)
             return base64.b64encode(self.oper.encrypt(f"{in_data}".encode("utf-8"))).decode("utf-8")
         else:
             # print(f"decrypting str: {in_data}")
             decoded_data = base64.b64decode(in_data)
+            # if the decoded_value is json, convert it to a dict 
+            try:
+                decoded_data = json.loads(decoded_data)
+            except:
+                pass
             return self.oper.decrypt(decoded_data).decode("utf-8")
 
 
