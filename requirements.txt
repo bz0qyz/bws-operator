@@ -1,0 +1,8 @@
+bitwarden-sdk >= 1.0.0
+cryptography  >= 43.0.3
+fastapi[standard] >= 0.115.5
+uvicorn[standard] >= 0.32.1
+pydantic >= 2.10.2
+dnspython >= 2.7.0
+email_validator >= 2.2.0
+pyinstaller >= 6.11.1
