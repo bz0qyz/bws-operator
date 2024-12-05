@@ -11,7 +11,8 @@ on:
         default: 'latest'
 
 permissions:
-  contents: write
+  contents: read
+  packages: write
 
 jobs:
   createimage:

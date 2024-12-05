@@ -15,6 +15,11 @@ RUN set -ex \
 
 
 FROM bitnami/python:3.12
+
+LABEL org.opencontainers.image.source=https://github.com/bz0qyz/bws-operator
+LABEL org.opencontainers.image.description="Bitwarden Secrets Manager API Operator"
+LABEL org.opencontainers.image.licenses=Unlicense
+
 ENV USER=app
 ENV USER_ID=1001
 ENV PYTHONUNBUFFERED=1
