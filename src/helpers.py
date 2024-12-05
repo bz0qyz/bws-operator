@@ -84,7 +84,16 @@ class ReturnFormat:
                 for key, value in secret.items():
                     output.append(f'{prefix}{key}="{value}"')
 
-        return '\n'.join(output) 
+        return '\n'.join(output)
+
+    def __dict_to_ini__(self, in_dict):
+        output = []
+        for key, value in in_dict.items():
+            if isinstance(value, dict):
+                output = output + self.__dict_to_ini__(in_dict=value)
+            else:
+                output.append(f'{key} = {value}')
+        return output
     
     def __format_ini__(self, out_data):
         output = []
@@ -92,8 +101,9 @@ class ReturnFormat:
             if self.ini_secret_key:
                 output.append(f'[{secret_key}]')
             for secret in secret_value:
-                for key, value in secret.items():
-                    output.append(f'{key} = {value}')
+                output = output + self.__dict_to_ini__(in_dict=secret)
+                #for key, value in secret.items():
+                #    output.append(f'{key} = {value}')
 
         return '\n'.join(output) 
 
