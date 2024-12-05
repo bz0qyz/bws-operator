@@ -23,7 +23,7 @@ LOG_LEVEL = {
 class Config:
     name = "bws-operator"
     description = "Bitwarden Secrets Operator"
-    version = "1.0.0"
+    version = "0.0.3"
     client = None
     args = None
     logger = None
