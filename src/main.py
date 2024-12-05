@@ -151,7 +151,7 @@ if config.args.strict_hostname:
 #####################################################
 # FastAPI Routs
 #####################################################
-@app.options('/ca-cert')
+@app.get('/ca-cert')
 async def show_ca_cert():
     if not config.args.tls_ca_file:
         return JSONResponse(
