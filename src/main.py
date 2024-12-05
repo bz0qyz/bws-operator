@@ -28,6 +28,11 @@ config.args = Arguments(
 app_logger = Logger(config.args.log_level)
 config.logger = app_logger.logger
 config.debug = True if config.args.log_level == 'debug' else False
+logger = config.logger
+
+logger.info(f"** Starting {config.name} v{config.version} **")
+if config.debug:
+    logger.debug("Debug logging enabled")
 
 if not config.client:
     config.client = BWClient(
@@ -43,8 +48,7 @@ if config.client and config.client.state == config.client.BW_STATE_UNATHENTICATE
 if config.client and not config.client.state == config.client.BW_STATE_CACHE_READY:
     config.client.load_cache()
 
-logger = config.logger
-# print(f"STATE: {config.client.state}")
+
 
 #####################################################
 # helper functions
@@ -215,8 +219,7 @@ if __name__ == '__main__':
         ssl_opts["ssl_ca_certs"] = f"{config.args.tls_ca_file}"
 
     try:
-        # Start the HTTP server 
-        print(f"Debug?: {config.debug}")
+        # Start the HTTP server
         uvicorn.run(
             app, host="0.0.0.0", port=config.args.http_port,
             log_level=config.args.log_level,
