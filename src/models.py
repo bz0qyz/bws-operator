@@ -32,3 +32,10 @@ class SecretRequest(BaseModel):
             raise ValueError('Either project_id or project_id must be provided')
 
         return values
+
+class SecretAcl(BaseModel):
+    token: str = Field(None, description="The ACL API Key")
+    is_active: bool = Field(True, description="Is the ACL active")
+    secrets: list[str] = Field(None, description="A list of secret IDs or secret Keys")
+    projects: list[str] = Field(None, description="A list of project IDs or project Names")
+    sources: list[str] = Field(None, description="A list of source IP CIDRs")

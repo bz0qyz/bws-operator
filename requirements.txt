@@ -6,3 +6,7 @@ pydantic >= 2.10.2
 dnspython >= 2.7.0
 email_validator >= 2.2.0
 pyinstaller >= 6.11.1
+tortoise-orm >= 0.22.2
+aiosqlite >= 0.20.0
+asyncpg >= 0.30.0
+aiomysql >= 0.2.0

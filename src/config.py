@@ -3,6 +3,23 @@ import sys
 import argparse
 import logging
 import ipaddress
+from database import models
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite://db.sqlite3")
+TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
+TORTOISE_ORM_CONFIG = {
+    "connections": {
+        "default": f"{DATABASE_URL}"
+    },
+    "apps": {
+        "models": {
+            "models": [models],
+            "default_connection": "default",
+        },
+    },
+    "use_tz": True,  # Use timezone-aware datetimes
+    "timezone": f"{TIMEZONE}",
+}
 
 LOG_FORMAT = {
     "std_format": logging.Formatter(
@@ -118,6 +135,18 @@ class Arguments:
             default=None, metavar=f"{app_name}",
             action=EnvDefault, envvar="API_STRICT_HOSTNAME"
         )
+        parser.add_argument(
+            '--secret-key', required=False,
+            help='Cypher Key for database encryption. ENV Var: SECRET_KEY',
+            default=None, metavar=f"long_and_strong_key",
+            action=EnvDefault, envvar="SECRET_KEY"
+        )
+        parser.add_argument(
+            '--no-encrypt', required=False,
+            help='Disables database encryption. ENV Var: NO_ENCRYPT',
+            default=False, metavar=f"long_and_strong_key",
+            type=bool, action=EnvDefault, envvar="NO_ENCRYPT"
+        )
         self.args = parser.parse_args()
 
         # Make the allowed CIDRs a list and verify that they are actial CIDRs
@@ -126,6 +155,8 @@ class Arguments:
 
         # Make the API token a list
         self.args.api_token = [token.strip() for token in self.args.api_token.split(',')]
+
+        #
 
     def __repr__(self):
         return self.args
@@ -179,6 +210,22 @@ class Logger:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(LOG_LEVEL[log_level]["format"])
         self.logger.addHandler(console_handler)
+
+        # Set specific logging for Tortoise ORM
+        tortoise_logger = logging.getLogger("tortoise")
+        tortoise_logger.setLevel(logging.INFO)
+        tortoise_logger.addHandler(console_handler)
+
+        # Set specific logging for aiosqlite
+        aiosqlite_logger = logging.getLogger("aiosqlite")
+        aiosqlite_logger.setLevel(logging.INFO)
+        aiosqlite_logger.addHandler(console_handler)
+
+        # Set specific logging for aiomysql
+        aiomysql_logger = logging.getLogger("aiomysql")
+        aiomysql_logger.setLevel(logging.INFO)
+        aiomysql_logger.addHandler(console_handler)
+
 
     def __repr__(self):
         return self.logger

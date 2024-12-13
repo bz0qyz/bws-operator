@@ -167,3 +167,5 @@ build/
 *.spec
 **/.env
 **/.venv
+test_secrets.*
+*.sqlite3*
