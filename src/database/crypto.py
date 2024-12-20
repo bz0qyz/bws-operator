@@ -57,7 +57,7 @@ class Crypto:
             pass
         return self.cipher.decrypt(decoded_data).decode("utf-8")
 
-    def hashstr(self, data: str):
+    async def hashstr(self, data: str):
         return hashlib.sha256(data.encode()).hexdigest()
 
 

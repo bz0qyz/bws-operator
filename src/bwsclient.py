@@ -1,5 +1,6 @@
 import os
 import json
+import yaml
 import logging
 import tempfile
 from bitwarden_sdk import BitwardenClient, DeviceType, schemas, client_settings_from_dict
@@ -84,7 +85,7 @@ class BWClient:
     def __get_secret_by_id__(self, secret_id: str):
         """
         Get a single secret's value by id
-        returns: string or dict (if the value is json)
+        returns: string or dict (if the value is json or yaml)
         """
         drop_keys = [
             'creation_date',
@@ -104,15 +105,23 @@ class BWClient:
 
         response_data = secret_response.data.__dict__
 
-        # Convert UUID to string and convert json values to dict
+        # Convert UUID to string and convert json or yaml values to dict
         for key, value in response_data.items():
+            value_dict = None
             if isinstance(value, schemas.UUID):
                 response_data[key] = str(value)
             if key == 'value':
                 try:
-                    response_data[key] = json.loads(value)
-                except:
+                    value_dict = json.loads(value)
+                except json.JSONDecodeError:
                     pass
+                try:
+                    value_dict = yaml.safe_load(value)
+                except yaml.YAMLError:
+                    pass
+                # If a dict or list was parsed from the value, save it as the value
+                if value_dict and isinstance(value_dict, (dict, list)):
+                    response_data[key] = value_dict
 
         # Drop unused keys
         for key in drop_keys:

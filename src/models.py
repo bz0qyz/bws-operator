@@ -8,7 +8,7 @@ class HeaderModel(BaseModel):
 class SecretOutputFormat(BaseModel):
     type: Literal[*RETURN_FORMAT.keys()] = Field("json", description="The output format for the response.")
     pyfstr: str = Field(None, description="A python format string. Variables: {key}, {value}. Accept header used for Content-Type.")
-    secret_key: bool = Field(True, description="Show the secret key header in 'ini' and 'env' output format.")
+    secret_key: bool = Field(True, description="Show the secret key header in the output format.")
     env_export: bool = Field(False, description="Add the 'export' prefix to the 'env' output format.")
 
     def __str__(self):

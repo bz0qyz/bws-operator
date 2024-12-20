@@ -2,14 +2,13 @@ import os
 import sys
 import argparse
 import logging
-import ipaddress
+from zoneinfo import ZoneInfo
 from database import models
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite://db.sqlite3")
-TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
+INIT_LOGS = []
 TORTOISE_ORM_CONFIG = {
     "connections": {
-        "default": f"{DATABASE_URL}"
+        "default": "sqlite://db.sqlite3"
     },
     "apps": {
         "models": {
@@ -18,7 +17,7 @@ TORTOISE_ORM_CONFIG = {
         },
     },
     "use_tz": True,  # Use timezone-aware datetimes
-    "timezone": f"{TIMEZONE}",
+    "timezone": f"utc",  # Set the timezone
 }
 
 LOG_FORMAT = {
@@ -40,7 +39,7 @@ LOG_LEVEL = {
 class Config:
     name = "bws-operator"
     description = "Bitwarden Secrets Operator"
-    version = "0.0.3"
+    version = "0.1.0"
     client = None
     args = None
     logger = None
@@ -49,18 +48,21 @@ class Config:
 class Arguments:
     DEFAULT_API_URL = "https://api.bitwarden.com"
     DEFAULT_IDENTITY_URL = "https://identity.bitwarden.com"
-    DEFAULT_ALLOWED_CIDRS = "172.17.0.0/16"
-    DEFAULT_API_HTTP_PORT = 6666
+    DEFAULT_API_HTTP_PORT = 8080
+    DEFAULT_DATABASE_URL = "sqlite://db.sqlite3"
+    DEFAULT_DATABASE_TIMEZONE = "UTC"
 
     def __init__(self, app_name: str, app_version: str, app_description: str):
         parser = argparse.ArgumentParser(description=app_description, prog=f"{app_name} {app_version}")
+        # General Arguments
         parser.add_argument('-l', '--log-level', required=False,
             help=f'Log level: {", ".join(LOG_LEVEL.keys())}. ENV Var: LOG_LEVEL',
             choices=LOG_LEVEL.keys(), default='info', metavar='info',
             action=EnvDefault, envvar="LOG_LEVEL"
         )
+        # Bitwarden Arguments
         parser.add_argument(
-            '-t', '--access_token', required=True,
+            '-t', '--access-token', required=True,
             help='Bitwarden Machine Access Token. ENV Var: BW_ACCESS_TOKEN',
             action=EnvDefault, envvar="BW_ACCESS_TOKEN"
         )
@@ -81,30 +83,7 @@ class Arguments:
             default=self.DEFAULT_IDENTITY_URL, metavar=self.DEFAULT_IDENTITY_URL,
             action=EnvDefault, envvar="BW_IDENTITY_URL"
         )
-        parser.add_argument(
-            '--allowed-cidrs', required=False,
-            help='Enforce API Allowed CIDRs (comma seperated). ENV Var: API_ALLOWED_CIDRS',
-            default=self.DEFAULT_ALLOWED_CIDRS, metavar="'192.168.0.0/24, 172.21.254.0/24'",
-            action=EnvDefault, envvar="API_ALLOWED_CIDRS"
-        )
-        parser.add_argument(
-            '--api-token', required=True,
-            help='Enforce an API token header. Multiple allowed (comma seperated). ENV Var: API_TOKEN',
-            default=None, metavar='long-obscure-string-or-uuid',
-            action=EnvDefault, envvar="API_TOKEN"
-        )
-        parser.add_argument(
-            '--api-token-header', required=False,
-            help='Header name for the API Token. ENV Var: API_TOKEN_HEADER',
-            default='X-Token', metavar='X-Token',
-            action=EnvDefault, envvar="API_TOKEN_HEADER"
-        )
-        parser.add_argument(
-            '--allowed-user-agent', required=False,
-            help='Enforce an client userAgent header. ENV Var: API_ALLOWED_USER_AGENT',
-            default=f"{app_name}-client", metavar=f"{app_name}-client",
-            action=EnvDefault, envvar="API_ALLOWED_USER_AGENT"
-        )
+        # API Server Arguments
         parser.add_argument(
             '-p', '--http-port', required=False,
             help='Port to listen on for the HTTP Server. ENV Var: API_HTTP_PORT',
@@ -113,7 +92,7 @@ class Arguments:
         )
         parser.add_argument(
             '--tls-key-file', required=False,
-            help='TLS Key file (pem format) for the HTTP Server. ENV Var: API_HTTP_PORT',
+            help='TLS Key file (pem format) for the HTTP Server. ENV Var: API_TLS_KEY_FILE',
             default=None, metavar=f"/path/to/key/file.pem",
             action=EnvDefault, envvar="API_TLS_KEY_FILE"
         )
@@ -129,11 +108,55 @@ class Arguments:
             default=None, metavar=f"/path/to/cert/ca.pem",
             action=EnvDefault, envvar="API_TLS_CA_CERT_FILE"
         )
+        # API Security Arguments
         parser.add_argument(
             '--strict-hostname', required=False,
             help='Enforces the use of a hostname for the API interface. ENV Var: API_STRICT_HOSTNAME',
             default=None, metavar=f"{app_name}",
             action=EnvDefault, envvar="API_STRICT_HOSTNAME"
+        )
+        parser.add_argument(
+            '--api-token-header', required=False,
+            help='Header name for the API Token. ENV Var: API_TOKEN_HEADER',
+            default='X-Token', metavar='X-Token',
+            action=EnvDefault, envvar="API_TOKEN_HEADER"
+        )
+        parser.add_argument(
+            '--allowed-user-agent', required=False,
+            help='Enforce an client userAgent header. ENV Var: API_ALLOWED_USER_AGENT',
+            default=f"{app_name}-client", metavar=f"{app_name}-client",
+            action=EnvDefault, envvar="API_ALLOWED_USER_AGENT"
+        )
+        parser.add_argument(
+            '--token-deny-limit', required=False,
+            help='Auto-lock an API key if it has been denied this many times. a value of 0 disables auto-lock. ENV Var: API_TOKEN_DENY_LIMIT',
+            type=int, default=6, metavar=6,
+            action=EnvDefault, envvar="API_TOKEN_DENY_LIMIT"
+        )
+        parser.add_argument(
+            '--token-deny-minutes', required=False,
+            help='Minutes in history to look for token denies. ENV Var: API_TOKEN_DENY_MINUTES',
+            type=int, default=180, metavar=180,
+            action=EnvDefault, envvar="API_TOKEN_DENY_MINUTES"
+        )
+        parser.add_argument(
+            '--token-lock-minutes', required=False,
+            help='Duration of API token auto-lock. ENV Var: API_TOKEN_LOCK_MINUTES',
+            type=int, default=10, metavar=10,
+            action=EnvDefault, envvar="API_TOKEN_LOCK_MINUTES"
+        )
+        # Database Arguments
+        parser.add_argument(
+            '--database-url', required=False,
+            help='Database URL. See https://tortoise.github.io/databases.html. ENV Var: DATABASE_URL',
+            default=self.DEFAULT_DATABASE_URL, metavar=self.DEFAULT_DATABASE_URL,
+            action=EnvDefault, envvar="DATABASE_URL"
+        )
+        parser.add_argument(
+            '--database-timezone', required=False,
+            help='Database URL. See https://tortoise.github.io/databases.html. ENV Var: DATABASE_URL',
+            default=self.DEFAULT_DATABASE_TIMEZONE, metavar=self.DEFAULT_DATABASE_TIMEZONE,
+            action=EnvDefault, envvar="DATABASE_TIMEZONE"
         )
         parser.add_argument(
             '--secret-key', required=False,
@@ -144,32 +167,37 @@ class Arguments:
         parser.add_argument(
             '--no-encrypt', required=False,
             help='Disables database encryption. ENV Var: NO_ENCRYPT',
-            default=False, metavar=f"long_and_strong_key",
+            default=False, metavar=f"False",
             type=bool, action=EnvDefault, envvar="NO_ENCRYPT"
         )
+
         self.args = parser.parse_args()
 
-        # Make the allowed CIDRs a list and verify that they are actial CIDRs
-        allowed_cidrs = [cidr.strip() for cidr in self.args.allowed_cidrs.split(',')]
-        self.args.allowed_cidrs = self.validate_cidrs(cidrs=allowed_cidrs)
+        # Verify the timezone is valid
+        if not self.is_valid_timezone(self.args.database_timezone):
+            INIT_LOGS.append(
+                {"level": "warning", "message": f"Invalid timezone requested: '{self.args.database_timezone}'"})
+            INIT_LOGS.append(
+                {"level": "info", "message": f"Valid Timezones: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"})
+            INIT_LOGS.append(
+                {"level": "info", "message": f"Falling back to the default timezone: '{self.DEFAULT_DATABASE_TIMEZONE}'"})
 
-        # Make the API token a list
-        self.args.api_token = [token.strip() for token in self.args.api_token.split(',')]
+            self.args.database_timezone = self.DEFAULT_DATABASE_TIMEZONE
 
-        #
+        # Set the database connection and timezone
+        TORTOISE_ORM_CONFIG["connections"]["default"] = self.args.database_url
+        TORTOISE_ORM_CONFIG["timezone"] = self.args.database_timezone
+
 
     def __repr__(self):
         return self.args
 
-    def validate_cidrs(self, cidrs: list):
-        valid_cidrs = []
-        for cidr in cidrs:
-            try:
-                ipaddress.ip_network(cidr, strict=False)  # Validate CIDR
-                valid_cidrs.append(cidr)
-            except ValueError:
-                print(f"[WARNING] Invalid CIDR: '{cidr}'. Ommitting it.")
-        return valid_cidrs
+    def is_valid_timezone(self, tz_name):
+        try:
+            ZoneInfo(tz_name)
+            return True
+        except Exception as e:
+            return False
 
 
 class EnvDefault(argparse.Action):
@@ -213,17 +241,17 @@ class Logger:
 
         # Set specific logging for Tortoise ORM
         tortoise_logger = logging.getLogger("tortoise")
-        tortoise_logger.setLevel(logging.INFO)
+        tortoise_logger.setLevel(logging.WARNING)
         tortoise_logger.addHandler(console_handler)
 
         # Set specific logging for aiosqlite
         aiosqlite_logger = logging.getLogger("aiosqlite")
-        aiosqlite_logger.setLevel(logging.INFO)
+        aiosqlite_logger.setLevel(logging.WARNING)
         aiosqlite_logger.addHandler(console_handler)
 
         # Set specific logging for aiomysql
         aiomysql_logger = logging.getLogger("aiomysql")
-        aiomysql_logger.setLevel(logging.INFO)
+        aiomysql_logger.setLevel(logging.WARNING)
         aiomysql_logger.addHandler(console_handler)
 
 
