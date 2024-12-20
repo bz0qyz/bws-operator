@@ -8,7 +8,7 @@ class HeaderModel(BaseModel):
 class SecretOutputFormat(BaseModel):
     type: Literal[*RETURN_FORMAT.keys()] = Field("json", description="The output format for the response.")
     pyfstr: str = Field(None, description="A python format string. Variables: {key}, {value}. Accept header used for Content-Type.")
-    secret_key: bool = Field(True, description="Show the secret key header in 'ini' and 'env' output format.")
+    secret_key: bool = Field(True, description="Show the secret key header in the output format.")
     env_export: bool = Field(False, description="Add the 'export' prefix to the 'env' output format.")
 
     def __str__(self):
@@ -32,3 +32,10 @@ class SecretRequest(BaseModel):
             raise ValueError('Either project_id or project_id must be provided')
 
         return values
+
+class SecretAcl(BaseModel):
+    token: str = Field(None, description="The ACL API Key")
+    is_active: bool = Field(True, description="Is the ACL active")
+    secrets: list[str] = Field(None, description="A list of secret IDs or secret Keys")
+    projects: list[str] = Field(None, description="A list of project IDs or project Names")
+    sources: list[str] = Field(None, description="A list of source IP CIDRs")

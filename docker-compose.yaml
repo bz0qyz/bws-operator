@@ -1,0 +1,20 @@
+services:
+  bws-operator:
+    container_name: bws-operator
+    restart: unless-stopped
+    image: ghcr.io/bz0qyz/bz0qyz/bws-operator:latest
+    networks:
+      demo:
+        ipv4_address: "192.168.100.254"
+    environment:
+      - BW_ORGANIZATION_ID=${BW_ORGANIZATION_ID}
+      - BW_ACCESS_TOKEN=${BW_ACCESS_TOKEN}
+      - LOG_LEVEL=info
+      - DATABASE_TIMEZONE="America/Chicago"
+      - DATABASE_URL="${DATABASE_URL}"
+      - SECRET_KEY=${SECRET_KEY}
+
+networks:
+  demo:
+    external:
+      name: demo
